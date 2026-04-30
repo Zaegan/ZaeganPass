@@ -214,9 +214,10 @@ def ensure_node(job_id="startup", node_version=None):
 
 def clone_or_pull(repo_name, ref, job_id):
     """Clone repo if not present, otherwise fetch and reset to ref."""
-    repo_dir = WORK_DIR / repo_name
+    repo_dir = WORK_DIR / repo_name / "repo"
     repo_url = f"https://github.com/{GITHUB_ACCOUNT}/{repo_name}.git"
 
+    repo_dir.parent.mkdir(parents=True, exist_ok=True)
     if not repo_dir.exists():
         log(job_id, f"Cloning {repo_url}...")
         rc, out = run(f"git clone {repo_url} {repo_dir}", job_id=job_id)
@@ -276,7 +277,121 @@ def load_manifest(repo_dir):
     manifest.setdefault("version_code", 1)
     manifest.setdefault("version_name", "1.0")
 
+    error = validate_manifest(manifest)
+    if error:
+        return None, error
+
     return manifest, None
+
+
+# Allowlist patterns for manifest field validation
+_RE_VERSION_SEGMENT = re.compile(r'^\d{1,6}$')
+_RE_VERSION_NAME    = re.compile(r'^[A-Za-z0-9][A-Za-z0-9.\-+_]{0,31}$')
+_RE_SDK_VERSION     = re.compile(r'^\d{1,3}$')
+_RE_JAVA_VERSION    = re.compile(r'^(1\.)?(\d{1,2})$')
+_RE_PERMISSION      = re.compile(r'^[A-Za-z][A-Za-z0-9_.]{0,127}$')
+_RE_APP_NAME        = re.compile(r'^[A-Za-z0-9][A-Za-z0-9 _.&\-]{0,48}$')
+_RE_VERSION_DOTS    = re.compile(r'^\d+(\.\d+){1,3}$')
+_RE_NPM_DEP         = re.compile(r'^@?[a-zA-Z0-9][a-zA-Z0-9._\-/]*(@[a-zA-Z0-9.\-^~*_]+)?$')
+_RE_GRADLE_DEP      = re.compile(r'^[a-zA-Z0-9._\-]+:[a-zA-Z0-9._\-]+:[a-zA-Z0-9._\-+]+$')
+_RE_SOURCE_DIR      = re.compile(r'^[a-zA-Z0-9_.\-/]+$')
+_RE_IDENTIFIER      = re.compile(r'^[a-zA-Z0-9_\-]+$')
+_JAVA_VERSIONS_OK   = {"8", "11", "17", "21", "1.8"}
+
+
+def validate_manifest(manifest):
+    """
+    Validate all manifest fields against strict allowlists.
+    Returns an error string if any field is invalid, otherwise None.
+    Prevents shell injection, XML injection, and path traversal via build.json.
+    """
+    build_type = manifest["type"]
+
+    # --- version_code: positive integer ---
+    vc = manifest["version_code"]
+    if not isinstance(vc, int) or vc < 1:
+        return f"build.json: version_code must be a positive integer, got {vc!r}"
+
+    # --- version_name: safe version string ---
+    vn = str(manifest["version_name"])
+    if not _RE_VERSION_NAME.match(vn):
+        return f"build.json: version_name contains disallowed characters: {vn!r}"
+
+    # --- SDK integers ---
+    for field in ("compile_sdk", "target_sdk", "min_sdk"):
+        v = manifest.get(field)
+        if v is not None:
+            if not isinstance(v, int) or not (1 <= v <= 99):
+                return f"build.json: {field} must be an integer between 1 and 99, got {v!r}"
+
+    # --- agp_version: digits and dots ---
+    agp = manifest.get("agp_version")
+    if agp is not None and not _RE_VERSION_DOTS.match(str(agp)):
+        return f"build.json: agp_version contains disallowed characters: {agp!r}"
+
+    # --- react_native_version: digits and dots ---
+    rnv = manifest.get("react_native_version")
+    if rnv is not None and not _RE_VERSION_DOTS.match(str(rnv)):
+        return f"build.json: react_native_version contains disallowed characters: {rnv!r}"
+
+    # --- node_version: digits and dots ---
+    nv = manifest.get("node_version")
+    if nv is not None and not _RE_VERSION_DOTS.match(str(nv)) and not _RE_VERSION_SEGMENT.match(str(nv)):
+        return f"build.json: node_version contains disallowed characters: {nv!r}"
+
+    # --- java_version: known safe set ---
+    jv = manifest.get("java_version")
+    if jv is not None and str(jv) not in _JAVA_VERSIONS_OK:
+        return f"build.json: java_version must be one of {sorted(_JAVA_VERSIONS_OK)}, got {jv!r}"
+
+    # --- app_name: safe display string ---
+    app_name = manifest.get("app_name")
+    if app_name is not None and not _RE_APP_NAME.match(str(app_name)):
+        return f"build.json: app_name contains disallowed characters: {app_name!r}"
+
+    # --- permissions: Android permission name format ---
+    for p in manifest.get("permissions", []):
+        if not isinstance(p, str) or not _RE_PERMISSION.match(p):
+            return f"build.json: invalid permission name: {p!r}"
+
+    # --- dependencies ---
+    deps = manifest.get("dependencies", [])
+    if not isinstance(deps, list):
+        return "build.json: dependencies must be a list"
+    if build_type == "react-native":
+        for d in deps:
+            if not isinstance(d, str) or not _RE_NPM_DEP.match(d):
+                return f"build.json: invalid npm dependency: {d!r}"
+    else:
+        for d in deps:
+            if not isinstance(d, str) or not _RE_GRADLE_DEP.match(d):
+                return f"build.json: invalid Gradle dependency: {d!r}"
+
+    # --- source_dirs: no path traversal ---
+    for d in manifest.get("source_dirs", []):
+        if not isinstance(d, str) or not _RE_SOURCE_DIR.match(d) or ".." in d:
+            return f"build.json: invalid source_dir: {d!r}"
+
+    # --- modules: safe identifiers + validate nested fields ---
+    for m in manifest.get("modules", []):
+        name = m if isinstance(m, str) else m.get("name", "")
+        if not _RE_IDENTIFIER.match(str(name)):
+            return f"build.json: invalid module name: {name!r}"
+        if isinstance(m, dict):
+            jv = m.get("java_version")
+            if jv is not None and str(jv) not in _JAVA_VERSIONS_OK:
+                return f"build.json: module '{name}': java_version must be one of {sorted(_JAVA_VERSIONS_OK)}, got {jv!r}"
+            for d in m.get("dependencies", []):
+                if not isinstance(d, str) or not _RE_GRADLE_DEP.match(d):
+                    return f"build.json: module '{name}': invalid Gradle dependency: {d!r}"
+
+    # --- native_modules: safe identifiers ---
+    for m in manifest.get("native_modules", []):
+        name = m if isinstance(m, str) else m.get("name", "")
+        if not _RE_IDENTIFIER.match(str(name)):
+            return f"build.json: invalid native_module name: {name!r}"
+
+    return None
 
 
 def needs_clean_build(repo_name, manifest):
@@ -302,8 +417,7 @@ def save_manifest_cache(repo_name, manifest):
 
 def generate_icons(repo_name, res_dir, job_id):
     """Generate icon density variants from icon-512.png into given res dir."""
-    repo_dir = WORK_DIR / repo_name
-    icon_src = repo_dir / "icon-512.png"
+    icon_src = WORK_DIR / repo_name / "repo" / "icon-512.png"
     if not icon_src.exists():
         return "icon-512.png not found in repo root"
 
@@ -342,7 +456,8 @@ def generate_icons(repo_name, res_dir, job_id):
 # ── React Native build path ───────────────────────────────────────────────────
 
 def rn_scaffold_dir(repo_name):
-    return WORK_DIR / f"{repo_name}App"
+    return WORK_DIR / repo_name / "scaffold"
+
 
 
 def rn_init(repo_name, manifest, job_id):
@@ -365,6 +480,12 @@ def rn_init(repo_name, manifest, job_id):
     )
     if rc != 0:
         return f"React Native init failed:\n{out}"
+
+    # npx init creates WORK_DIR/{app_name}; move it into the consolidated project dir
+    created_dir = WORK_DIR / app_name
+    if created_dir != app_dir:
+        app_dir.parent.mkdir(parents=True, exist_ok=True)
+        created_dir.rename(app_dir)
 
     # Patch package name, namespace, and version fields
     gradle_path = app_dir / "android" / "app" / "build.gradle"
@@ -412,7 +533,7 @@ android {
     )
     strings_path.write_text(strings_content)
 
-    # Patch AndroidManifest.xml — resizable activity + permissions
+    # Patch AndroidManifest.xml — resizable activity + config changes + permissions
     android_manifest_path = app_dir / "android" / "app" / "src" / "main" / "AndroidManifest.xml"
     log(job_id, "Patching AndroidManifest.xml...")
     android_manifest = android_manifest_path.read_text()
@@ -420,6 +541,13 @@ android {
         android_manifest = re.sub(
             r'(<activity\b)',
             r'\1\n        android:resizeableActivity="true"',
+            android_manifest,
+            count=1
+        )
+    if 'configChanges' not in android_manifest:
+        android_manifest = re.sub(
+            r'(<activity\b)',
+            r'\1\n        android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"',
             android_manifest,
             count=1
         )
@@ -561,7 +689,7 @@ def rn_build(repo_name, app_dir, job_id, node_version=None):
 # ── Native Android build path ─────────────────────────────────────────────────
 
 def native_scaffold_dir(repo_name):
-    return WORK_DIR / f"{repo_name}-native"
+    return WORK_DIR / repo_name / "scaffold"
 
 
 def native_build_gradle(pkg_name, repo_name, manifest):
