@@ -1,0 +1,12 @@
+{
+    "type": "android-native",
+    "compile_sdk": 35,
+    "target_sdk": 35,
+    "min_sdk": 21,
+    "dependencies": [
+        "androidx.appcompat:appcompat:1.6.1",
+        "com.google.android.material:material:1.11.0",
+        "androidx.constraintlayout:constraintlayout:2.1.4",
+        "androidx.cardview:cardview:1.0.0"
+    ]
+}

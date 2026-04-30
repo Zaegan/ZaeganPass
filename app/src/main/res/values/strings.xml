@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">PasswordGen</string>
+    <string name="password_placeholder">Tap Generate to create a password</string>
+    <string name="copy">Copy</string>
+    <string name="copied">Copied to clipboard</string>
+    <string name="clipboard_cleared">Clipboard cleared</string>
+    <string name="generate">Generate</string>
+    <string name="length_label">Length</string>
+    <string name="opt_lowercase">Lowercase  (a – z)</string>
+    <string name="opt_uppercase">Uppercase  (A – Z)</string>
+    <string name="opt_digits">Numbers  (0 – 9)</string>
+    <string name="opt_symbols">Symbols  (! @ # $ …)</string>
+    <string name="opt_exclude_ambiguous">Exclude ambiguous  (0, O, o, 1, l, I)</string>
+    <string name="error_no_charset">Enable at least one character type.</string>
+    <string name="content_desc_copy">Copy password</string>
+    <string name="content_desc_minus">Decrease length</string>
+    <string name="content_desc_plus">Increase length</string>
+</resources>
