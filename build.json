@@ -1,5 +1,6 @@
 {
     "type": "android-native",
+    "app_name": "PasswordGen",
     "compile_sdk": 35,
     "target_sdk": 35,
     "min_sdk": 21,
