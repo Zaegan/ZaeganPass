@@ -976,6 +976,43 @@ def label_artifacts(manifest, repo_name, apk_path, signed_apk_path, aab_path):
     return tuple(results)
 
 
+def find_artifacts(repo_name):
+    """Return sorted list of labeled artifact Paths for a repo.
+
+    Scans both native (scaffold/app/) and RN (scaffold/android/app/) output
+    directories. Excludes Gradle default names (app-release*, app-debug*)
+    which indicate an unlabeled or intermediate build.
+    """
+    scaffold = WORK_DIR / repo_name / "scaffold"
+    if not scaffold.exists():
+        return []
+    outputs_dirs = [
+        scaffold / "app" / "build" / "outputs",
+        scaffold / "android" / "app" / "build" / "outputs",
+    ]
+    artifacts = []
+    for outputs in outputs_dirs:
+        if not outputs.exists():
+            continue
+        for pattern in ("*.apk", "*.aab"):
+            for path in outputs.rglob(pattern):
+                if path.name.startswith("app-release") or path.name.startswith("app-debug"):
+                    continue
+                artifacts.append(path)
+    return sorted(artifacts, key=lambda p: p.name)
+
+
+def list_repos_with_artifacts():
+    """Return sorted list of repo names that have at least one labeled artifact."""
+    if not WORK_DIR.exists():
+        return []
+    repos = []
+    for entry in sorted(WORK_DIR.iterdir()):
+        if entry.is_dir() and find_artifacts(entry.name):
+            repos.append(entry.name)
+    return repos
+
+
 def run_job(job_id, repo_name, ref, subpath, force_clean):
     with jobs_lock:
         jobs[job_id]["status"] = "running"
@@ -1113,6 +1150,25 @@ class BuildHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_html(self, code, body):
+        page = (
+            "<!DOCTYPE html><html><head>"
+            '<meta charset="utf-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">'
+            "<title>Build Server</title>"
+            "<style>"
+            "body{font-family:sans-serif;max-width:700px;margin:2rem auto;padding:0 1rem}"
+            "a{color:#0070f3}ul{line-height:2}h1{margin-bottom:.5rem}"
+            "</style>"
+            f"</head><body>{body}</body></html>"
+        )
+        encoded = page.encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", len(encoded))
+        self.end_headers()
+        self.wfile.write(encoded)
+
     def do_POST(self):
         if self.path == "/build":
             length = int(self.headers.get("Content-Length", 0))
@@ -1216,6 +1272,72 @@ class BuildHandler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", len(body))
             self.end_headers()
             self.wfile.write(body)
+            return
+
+        # ── Browsable artifact UI ────────────────────────────────────────────
+
+        # GET / — project index
+        if parsed.path in ('/', ''):
+            repos = list_repos_with_artifacts()
+            if repos:
+                items = "".join(f'<li><a href="/{r}/">{r}</a></li>' for r in repos)
+                listing = f"<ul>{items}</ul>"
+            else:
+                listing = "<p><em>No completed builds yet.</em></p>"
+            self._send_html(200,
+                f"<h1>Build Server</h1>{listing}"
+                "<hr><p><small>Artifacts served live from the build workspace.</small></p>")
+            return
+
+        # GET /{repo}/ — artifact list for one project
+        m = re.match(r'^/([A-Za-z0-9_-]+)/$', parsed.path)
+        if m:
+            repo = m.group(1)
+            artifacts = find_artifacts(repo)
+            if not artifacts:
+                self._send_html(404,
+                    f"<h1>{repo}</h1><p>No artifacts found.</p>"
+                    '<p><a href="/">&larr; All projects</a></p>')
+                return
+            items = "".join(
+                f'<li><a href="/{repo}/{p.name}">{p.name}</a></li>'
+                for p in artifacts
+            )
+            self._send_html(200,
+                f"<h1>{repo}</h1>"
+                '<p><a href="/">&larr; All projects</a></p>'
+                f"<ul>{items}</ul>")
+            return
+
+        # GET /{repo}/{filename} — file download
+        m = re.match(r'^/([A-Za-z0-9_-]+)/([^/]+)$', parsed.path)
+        if m:
+            repo = m.group(1)
+            filename = m.group(2)
+            # Validate: only labeled artifacts with known extensions
+            if not re.match(r'^[A-Za-z0-9._-]+\.(apk|aab)$', filename):
+                self.send_json(400, {"error": "Invalid filename"})
+                return
+            artifacts = find_artifacts(repo)
+            target = next((p for p in artifacts if p.name == filename), None)
+            if not target or not target.exists():
+                self.send_json(404, {"error": "Artifact not found"})
+                return
+            ctype = ("application/vnd.android.package-archive"
+                     if filename.endswith(".apk") else "application/octet-stream")
+            size = target.stat().st_size
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", size)
+            self.send_header("Content-Disposition",
+                             f'attachment; filename="{filename}"')
+            self.end_headers()
+            with open(target, "rb") as f:
+                while True:
+                    chunk = f.read(65536)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
             return
 
         self.send_json(404, {"error": "Not found"})
