@@ -955,6 +955,27 @@ jobs_lock = threading.Lock()
 job_queue = queue.Queue()
 
 
+def label_artifacts(manifest, repo_name, apk_path, signed_apk_path, aab_path):
+    """Rename build artifacts to include app name and version.
+    Returns (apk_out, signed_apk_out, aab_out) paths regardless of existence."""
+    raw_name = manifest.get("app_name", repo_name)
+    app_name = re.sub(r'[^A-Za-z0-9._-]', '-', raw_name).strip('-')
+    version  = re.sub(r'[^A-Za-z0-9._-]', '-', str(manifest.get("version_name", "1.0"))).strip('-')
+    prefix   = f"{app_name}-{version}"
+
+    results = []
+    for src, suffix in [
+        (apk_path,        f"{prefix}.apk"),
+        (signed_apk_path, f"{prefix}-signed.apk"),
+        (aab_path,        f"{prefix}.aab"),
+    ]:
+        dst = src.parent / suffix
+        if src.exists():
+            src.rename(dst)
+        results.append(dst)
+    return tuple(results)
+
+
 def run_job(job_id, repo_name, ref, subpath, force_clean):
     with jobs_lock:
         jobs[job_id]["status"] = "running"
@@ -1006,11 +1027,12 @@ def run_job(job_id, repo_name, ref, subpath, force_clean):
                 apk_path = app_dir / "android" / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
                 signed_apk_path = app_dir / "android" / "app" / "build" / "outputs" / "apk" / "releaseSigned" / "app-releaseSigned.apk"
                 aab_path = app_dir / "android" / "app" / "build" / "outputs" / "bundle" / "release" / "app-release.aab"
+                apk_out, signed_out, aab_out = label_artifacts(manifest, repo_name, apk_path, signed_apk_path, aab_path)
                 result_message = (
                     f"status: success\n"
-                    f"apk: {apk_path}\n"
-                    f"signed_apk: {signed_apk_path}\n"
-                    f"aab: {aab_path}"
+                    f"apk: {apk_out}\n"
+                    f"signed_apk: {signed_out}\n"
+                    f"aab: {aab_out}"
                 )
             else:
                 result_message = f"status: failed\n\n{build_output}"
@@ -1036,11 +1058,12 @@ def run_job(job_id, repo_name, ref, subpath, force_clean):
                 apk_path = app_dir / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
                 signed_apk_path = app_dir / "app" / "build" / "outputs" / "apk" / "releaseSigned" / "app-releaseSigned.apk"
                 aab_path = app_dir / "app" / "build" / "outputs" / "bundle" / "release" / "app-release.aab"
+                apk_out, signed_out, aab_out = label_artifacts(manifest, repo_name, apk_path, signed_apk_path, aab_path)
                 result_message = (
                     f"status: success\n"
-                    f"apk: {apk_path}\n"
-                    f"signed_apk: {signed_apk_path}\n"
-                    f"aab: {aab_path}"
+                    f"apk: {apk_out}\n"
+                    f"signed_apk: {signed_out}\n"
+                    f"aab: {aab_out}"
                 )
             else:
                 result_message = f"status: failed\n\n{build_output}"
@@ -1251,7 +1274,7 @@ def run_cli(repo_dir, output_dir, force_clean):
             apk = app_dir / "android" / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
             signed_apk = app_dir / "android" / "app" / "build" / "outputs" / "apk" / "releaseSigned" / "app-releaseSigned.apk"
             aab = app_dir / "android" / "app" / "build" / "outputs" / "bundle" / "release" / "app-release.aab"
-            artifacts = [p for p in [apk, signed_apk, aab] if p.exists()]
+            artifacts = label_artifacts(manifest, repo_name, apk, signed_apk, aab)
         else:
             print(f"Build FAILED.\n{build_output}", flush=True)
             sys.exit(1)
@@ -1278,7 +1301,7 @@ def run_cli(repo_dir, output_dir, force_clean):
             apk = app_dir / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
             signed_apk = app_dir / "app" / "build" / "outputs" / "apk" / "releaseSigned" / "app-releaseSigned.apk"
             aab = app_dir / "app" / "build" / "outputs" / "bundle" / "release" / "app-release.aab"
-            artifacts = [p for p in [apk, signed_apk, aab] if p.exists()]
+            artifacts = label_artifacts(manifest, repo_name, apk, signed_apk, aab)
         else:
             print(f"Build FAILED.\n{build_output}", flush=True)
             sys.exit(1)
