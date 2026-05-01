@@ -1275,12 +1275,16 @@ class BuildHandler(http.server.BaseHTTPRequestHandler):
             return
 
         # ── Browsable artifact UI ────────────────────────────────────────────
+        # Routes: GET /  →  GET /artifacts/{repo}/  →  GET /artifacts/{repo}/{filename}
+        # All sub-routes are namespaced under /artifacts/ to avoid any collision
+        # with current or future API paths.
 
-        # GET / — project index
+        # GET / — project index (entry point)
         if parsed.path in ('/', ''):
             repos = list_repos_with_artifacts()
             if repos:
-                items = "".join(f'<li><a href="/{r}/">{r}</a></li>' for r in repos)
+                items = "".join(
+                    f'<li><a href="/artifacts/{r}/">{r}</a></li>' for r in repos)
                 listing = f"<ul>{items}</ul>"
             else:
                 listing = "<p><em>No completed builds yet.</em></p>"
@@ -1289,8 +1293,8 @@ class BuildHandler(http.server.BaseHTTPRequestHandler):
                 "<hr><p><small>Artifacts served live from the build workspace.</small></p>")
             return
 
-        # GET /{repo}/ — artifact list for one project
-        m = re.match(r'^/([A-Za-z0-9_-]+)/$', parsed.path)
+        # GET /artifacts/{repo}/ — artifact list for one project
+        m = re.match(r'^/artifacts/([A-Za-z0-9_-]+)/$', parsed.path)
         if m:
             repo = m.group(1)
             artifacts = find_artifacts(repo)
@@ -1300,7 +1304,7 @@ class BuildHandler(http.server.BaseHTTPRequestHandler):
                     '<p><a href="/">&larr; All projects</a></p>')
                 return
             items = "".join(
-                f'<li><a href="/{repo}/{p.name}">{p.name}</a></li>'
+                f'<li><a href="/artifacts/{repo}/{p.name}">{p.name}</a></li>'
                 for p in artifacts
             )
             self._send_html(200,
@@ -1309,8 +1313,8 @@ class BuildHandler(http.server.BaseHTTPRequestHandler):
                 f"<ul>{items}</ul>")
             return
 
-        # GET /{repo}/{filename} — file download
-        m = re.match(r'^/([A-Za-z0-9_-]+)/([^/]+)$', parsed.path)
+        # GET /artifacts/{repo}/{filename} — file download
+        m = re.match(r'^/artifacts/([A-Za-z0-9_-]+)/([^/]+)$', parsed.path)
         if m:
             repo = m.group(1)
             filename = m.group(2)
