@@ -460,6 +460,28 @@ def rn_scaffold_dir(repo_name):
 
 
 
+def patch_rn_themes(app_dir, job_id):
+    """Patch RN scaffold themes.xml to set windowLightStatusBar.
+
+    Safe to call on every build — idempotent, only writes if not already set.
+    """
+    for variant, light_val in [("values", "true"), ("values-night", "false")]:
+        themes_path = (app_dir / "android" / "app" / "src" / "main" / "res"
+                       / variant / "themes.xml")
+        if not themes_path.exists():
+            continue
+        themes = themes_path.read_text()
+        if "windowLightStatusBar" not in themes:
+            log(job_id, f"Patching {variant}/themes.xml (windowLightStatusBar={light_val})...")
+            themes = re.sub(
+                r'(</style>)',
+                f'    <item name="android:windowLightStatusBar">{light_val}</item>\n    \\1',
+                themes,
+                count=1
+            )
+            themes_path.write_text(themes)
+
+
 def rn_init(repo_name, manifest, job_id):
     """Run full React Native project initialization."""
     app_dir = rn_scaffold_dir(repo_name)
@@ -564,21 +586,7 @@ android {
         )
     android_manifest_path.write_text(android_manifest)
 
-    # Patch themes.xml — windowLightStatusBar for correct status bar icon colour
-    for variant, light_val in [("values", "true"), ("values-night", "false")]:
-        themes_path = (app_dir / "android" / "app" / "src" / "main" / "res"
-                       / variant / "themes.xml")
-        if themes_path.exists():
-            log(job_id, f"Patching {variant}/themes.xml (windowLightStatusBar={light_val})...")
-            themes = themes_path.read_text()
-            if "windowLightStatusBar" not in themes:
-                themes = re.sub(
-                    r'(</style>)',
-                    f'    <item name="android:windowLightStatusBar">{light_val}</item>\n    \\1',
-                    themes,
-                    count=1
-                )
-                themes_path.write_text(themes)
+    patch_rn_themes(app_dir, job_id)
 
     # Move default Kotlin files to correct package path
     old_pkg_dir = app_dir / "android" / "app" / "src" / "main" / "java" / "com" / app_name.lower()
@@ -1072,6 +1080,8 @@ def run_job(job_id, repo_name, ref, subpath, force_clean):
             error = rn_sync_source(repo_name, repo_dir, app_dir, job_id)
             if error:
                 raise RuntimeError(error)
+
+            patch_rn_themes(app_dir, job_id)
 
             success, build_output = rn_build(repo_name, app_dir, job_id, node_version)
 
