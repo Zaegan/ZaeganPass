@@ -1139,6 +1139,8 @@ def worker():
 
 class BuildHandler(http.server.BaseHTTPRequestHandler):
 
+    protocol_version = "HTTP/1.1"
+
     def log_message(self, format, *args):
         pass  # suppress default access log
 
