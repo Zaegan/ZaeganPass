@@ -1077,7 +1077,7 @@ def run_job(job_id, repo_name, ref, subpath, force_clean):
 
             if success:
                 save_manifest_cache(repo_name, manifest)
-                apk_path = app_dir / "android" / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
+                apk_path = app_dir / "android" / "app" / "build" / "outputs" / "apk" / "release" / "app-release-unsigned.apk"
                 signed_apk_path = app_dir / "android" / "app" / "build" / "outputs" / "apk" / "releaseSigned" / "app-releaseSigned.apk"
                 aab_path = app_dir / "android" / "app" / "build" / "outputs" / "bundle" / "release" / "app-release.aab"
                 apk_out, signed_out, aab_out = label_artifacts(manifest, repo_name, apk_path, signed_apk_path, aab_path)
@@ -1108,7 +1108,7 @@ def run_job(job_id, repo_name, ref, subpath, force_clean):
 
             if success:
                 save_manifest_cache(repo_name, manifest)
-                apk_path = app_dir / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
+                apk_path = app_dir / "app" / "build" / "outputs" / "apk" / "release" / "app-release-unsigned.apk"
                 signed_apk_path = app_dir / "app" / "build" / "outputs" / "apk" / "releaseSigned" / "app-releaseSigned.apk"
                 aab_path = app_dir / "app" / "build" / "outputs" / "bundle" / "release" / "app-release.aab"
                 apk_out, signed_out, aab_out = label_artifacts(manifest, repo_name, apk_path, signed_apk_path, aab_path)
