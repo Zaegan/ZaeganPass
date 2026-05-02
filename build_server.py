@@ -564,6 +564,22 @@ android {
         )
     android_manifest_path.write_text(android_manifest)
 
+    # Patch themes.xml — windowLightStatusBar for correct status bar icon colour
+    for variant, light_val in [("values", "true"), ("values-night", "false")]:
+        themes_path = (app_dir / "android" / "app" / "src" / "main" / "res"
+                       / variant / "themes.xml")
+        if themes_path.exists():
+            log(job_id, f"Patching {variant}/themes.xml (windowLightStatusBar={light_val})...")
+            themes = themes_path.read_text()
+            if "windowLightStatusBar" not in themes:
+                themes = re.sub(
+                    r'(</style>)',
+                    f'    <item name="android:windowLightStatusBar">{light_val}</item>\n    \\1',
+                    themes,
+                    count=1
+                )
+                themes_path.write_text(themes)
+
     # Move default Kotlin files to correct package path
     old_pkg_dir = app_dir / "android" / "app" / "src" / "main" / "java" / "com" / app_name.lower()
     new_pkg_dir = app_dir / "android" / "app" / "src" / "main" / "java" / pkg_path(pkg_name)
