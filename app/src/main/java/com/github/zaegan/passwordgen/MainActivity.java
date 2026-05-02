@@ -3,22 +3,32 @@ package com.github.zaegan.passwordgen;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.appcompat.widget.Toolbar;
+
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity {
+
+    private static final String PREFS_SETTINGS = "passwordgen_settings";
+    private static final String KEY_THEME      = "theme_mode";
 
     // ── Preference keys (settings only — password is NEVER persisted) ─────────
     private static final String PREFS_NAME    = "passwordgen_prefs";
@@ -63,8 +73,18 @@ public class MainActivity extends AppCompatActivity {
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
+    public static void applyTheme(String mode) {
+        switch (mode) {
+            case "dark":   AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);  break;
+            case "light":  AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);   break;
+            default:       AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM); break;
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        applyTheme(getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE)
+                .getString(KEY_THEME, "system"));
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -98,6 +118,52 @@ public class MainActivity extends AppCompatActivity {
 
         btnCopy.setOnClickListener(v -> copyToClipboard());
         findViewById(R.id.btnGenerate).setOnClickListener(v -> generatePassword());
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_theme) {
+            showThemeDialog();
+            return true;
+        } else if (id == R.id.action_privacy) {
+            startActivity(new Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://zaegan.github.io/PasswordGen/privacy")));
+            return true;
+        } else if (id == R.id.action_rate) {
+            startActivity(new Intent(Intent.ACTION_VIEW,
+                    Uri.parse("market://details?id=" + getPackageName())));
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void showThemeDialog() {
+        String current = getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE)
+                .getString(KEY_THEME, "system");
+        String[] labels = {"Light", "Dark", "System default"};
+        String[] values = {"light", "dark", "system"};
+        int checked = 2;
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equals(current)) { checked = i; break; }
+        }
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.theme_dialog_title)
+                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
+                    String mode = values[which];
+                    getSharedPreferences(PREFS_SETTINGS, MODE_PRIVATE)
+                            .edit().putString(KEY_THEME, mode).apply();
+                    applyTheme(mode);
+                    dialog.dismiss();
+                    recreate();
+                })
+                .show();
     }
 
     @Override

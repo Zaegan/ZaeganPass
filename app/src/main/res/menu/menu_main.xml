@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/action_theme"
+        android:title="@string/menu_theme"
+        android:showAsAction="never" />
+    <item
+        android:id="@+id/action_privacy"
+        android:title="@string/menu_privacy"
+        android:showAsAction="never" />
+    <item
+        android:id="@+id/action_rate"
+        android:title="@string/menu_rate"
+        android:showAsAction="never" />
+</menu>
