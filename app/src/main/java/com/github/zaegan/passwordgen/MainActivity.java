@@ -12,8 +12,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -49,7 +52,7 @@ public class MainActivity extends AppCompatActivity {
     // ── Views ──────────────────────────────────────────────────────────────────
     private TextView  tvPassword;
     private TextView  tvStatus;
-    private TextView  tvLength;
+    private EditText  tvLength;
     private Button    btnCopy;
     private Button    btnMinus;
     private Button    btnPlus;
@@ -109,6 +112,20 @@ public class MainActivity extends AppCompatActivity {
 
         btnMinus.setOnClickListener(v -> adjustLength(-1));
         btnPlus.setOnClickListener(v  -> adjustLength(+1));
+
+        tvLength.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) commitLengthFromInput();
+        });
+        tvLength.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                commitLengthFromInput();
+                tvLength.clearFocus();
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(tvLength.getWindowToken(), 0);
+                return true;
+            }
+            return false;
+        });
 
         cbLower.setOnCheckedChangeListener((b, c)            -> savePrefs());
         cbUpper.setOnCheckedChangeListener((b, c)            -> savePrefs());
@@ -236,8 +253,20 @@ public class MainActivity extends AppCompatActivity {
         savePrefs();
     }
 
+    private void commitLengthFromInput() {
+        String text = tvLength.getText().toString().trim();
+        int val;
+        try { val = Integer.parseInt(text); }
+        catch (NumberFormatException e) { val = currentLength; }
+        currentLength = Math.max(LENGTH_MIN, Math.min(LENGTH_MAX, val));
+        updateLengthDisplay();
+        savePrefs();
+    }
+
     private void updateLengthDisplay() {
-        tvLength.setText(String.valueOf(currentLength));
+        String val = String.valueOf(currentLength);
+        tvLength.setText(val);
+        tvLength.setSelection(val.length());
         btnMinus.setEnabled(currentLength > LENGTH_MIN);
         btnPlus.setEnabled(currentLength  < LENGTH_MAX);
     }
