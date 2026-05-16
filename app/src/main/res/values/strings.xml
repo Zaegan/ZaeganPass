@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">PasswordGen</string>
+    <string name="app_name">ZaeganPass</string>
     <string name="password_placeholder">Tap Generate to create a password</string>
     <string name="copy">Copy</string>
     <string name="copied">Copied to clipboard</string>

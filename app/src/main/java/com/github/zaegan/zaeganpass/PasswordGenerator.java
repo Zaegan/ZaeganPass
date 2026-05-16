@@ -1,4 +1,4 @@
-package com.github.zaegan.passwordgen;
+package com.github.zaegan.zaeganpass;
 
 import java.security.SecureRandom;
 import java.util.Arrays;

@@ -1,4 +1,4 @@
-package com.github.zaegan.passwordgen;
+package com.github.zaegan.zaeganpass;
 
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -30,11 +30,11 @@ import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String PREFS_SETTINGS = "passwordgen_settings";
+    private static final String PREFS_SETTINGS = "zaeganpass_settings";
     private static final String KEY_THEME      = "theme_mode";
 
     // ── Preference keys (settings only — password is NEVER persisted) ─────────
-    private static final String PREFS_NAME    = "passwordgen_prefs";
+    private static final String PREFS_NAME    = "zaeganpass_prefs";
     private static final String KEY_LENGTH    = "length";
     private static final String KEY_LOWER     = "lower";
     private static final String KEY_UPPER     = "upper";
@@ -151,7 +151,7 @@ public class MainActivity extends AppCompatActivity {
             return true;
         } else if (id == R.id.action_privacy) {
             startActivity(new Intent(Intent.ACTION_VIEW,
-                    Uri.parse("https://zaegan.github.io/PasswordGen/privacy")));
+                    Uri.parse("https://zaegan.github.io/ZaeganPass/privacy")));
             return true;
         } else if (id == R.id.action_rate) {
             startActivity(new Intent(Intent.ACTION_VIEW,

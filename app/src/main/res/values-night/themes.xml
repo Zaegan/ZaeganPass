@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.PasswordGen" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.ZaeganPass" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">#78909C</item>
         <item name="colorPrimaryVariant">@color/colorPrimaryVariant</item>
         <item name="colorOnPrimary">@color/colorOnPrimary</item>

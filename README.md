@@ -1,4 +1,4 @@
-# PasswordGen
+# ZaeganPass
 
 A minimal, security-focused Android password generator.
 
@@ -19,7 +19,7 @@ A minimal, security-focused Android password generator.
 ### Via the build server (remote)
 
 ```bash
-./buildserver.sh build https://github.com/Zaegan/PasswordGen
+./buildserver.sh build ZaeganPass
 ```
 
 Other commands:
@@ -36,7 +36,7 @@ Other commands:
 `build_server.py` can be run as a self-contained build script without a running server. Pass `--repo-dir` to point it at a local checkout:
 
 ```bash
-python3 build_server.py --repo-dir /path/to/PasswordGen
+python3 build_server.py --repo-dir /path/to/ZaeganPass
 ```
 
 Optional flags:
@@ -70,7 +70,7 @@ build.json          ← build configuration (SDK versions, dependencies)
 build_server.py     ← standalone build script / server
 app/src/main/
   AndroidManifest.xml
-  java/com/github/zaegan/passwordgen/
+  java/com/github/zaegan/zaeganpass/
     PasswordGenerator.java   ← pure generation logic, no Android dependencies
     MainActivity.java        ← UI, clipboard handling, settings persistence
   res/
